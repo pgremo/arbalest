@@ -1,0 +1,133 @@
+[
+  'java',
+  'maven',
+  'signing'
+].forEach { apply plugin: it }
+
+group 'org.arbalest'
+version '1.0-SNAPSHOT'
+sourceCompatibility = 1.8
+
+repositories {
+  mavenCentral()
+}
+
+project.ext {
+  aether = [
+    version: '1.0.2.v20150114'
+  ]
+  maven = [
+    version: '3.3.9'
+  ]
+}
+
+configurations {
+  provided
+}
+
+signing {
+  sign configurations.archives
+}
+
+sourceSets {
+  main.compileClasspath += configurations.provided
+  test.compileClasspath += configurations.provided
+  test.runtimeClasspath += configurations.provided
+}
+
+dependencies {
+  compile "org.eclipse.aether:aether-api:${project.aether.version}",
+    "org.eclipse.aether:aether-util:${project.aether.version}",
+    "org.eclipse.aether:aether-impl:${project.aether.version}",
+    "org.eclipse.aether:aether-connector-basic:${project.aether.version}",
+    "org.eclipse.aether:aether-transport-file:${project.aether.version}",
+    "org.eclipse.aether:aether-transport-http:${project.aether.version}",
+    "org.apache.maven:maven-aether-provider:${project.maven.version}",
+    "org.apache.maven:maven-settings-builder:${project.maven.version}",
+    'org.slf4j:slf4j-jdk14:1.7.13'
+  provided 'javax.inject:javax.inject:1'
+  testCompile 'junit:junit:4.11'
+}
+
+javadoc {
+  classpath = sourceSets.main.compileClasspath
+}
+
+task javadocJar(type: Jar) {
+  classifier = 'javadoc'
+  from javadoc
+}
+
+task sourcesJar(type: Jar) {
+  classifier = 'sources'
+  from sourceSets.main.allSource
+}
+
+jar {
+  from {
+    (configurations.runtime).collect {
+      it.isDirectory() ? it : zipTree(it)
+    }
+  }
+  manifest {
+    attributes(
+      "Main-Class": "arbalest.Arbalest"
+    )
+  }
+}
+
+artifacts {
+  archives javadocJar, sourcesJar
+}
+
+uploadArchives {
+  repositories {
+    mavenDeployer {
+      beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
+
+      repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
+        authentication(userName: ossrhUsername, password: ossrhPassword)
+      }
+
+      snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
+        authentication(userName: ossrhUsername, password: ossrhPassword)
+      }
+
+      pom.project {
+        name 'Arbalest'
+        packaging 'jar'
+        description "A utility to download an application and it's dependencies before launching it"
+        url 'http://www.example.com/example-application'
+
+        scm {
+          connection 'scm:svn:http://foo.googlecode.com/svn/trunk/'
+          developerConnection 'scm:svn:https://foo.googlecode.com/svn/trunk/'
+          url 'http://foo.googlecode.com/svn/trunk/'
+        }
+
+        licenses {
+          license {
+            name 'The MIT License (MIT)'
+            url 'https://opensource.org/licenses/MIT'
+          }
+        }
+
+        developers {
+          developer {
+            id 'patrick.gremo'
+            name 'Patrick Gremo'
+            email 'patrick.gremo@gmail.com'
+          }
+        }
+      }
+    }
+  }
+}
+
+task runApp(type: JavaExec) {
+  classpath = files("${buildDir}/libs/${jar.archiveName}")
+  jvmArgs = ["-Darbalest.log.level=FINE"]
+  main = 'arbalest.Arbalest'
+  args = ['org.thorium:thorium:1.0-SNAPSHOT']
+  debug = false
+}
